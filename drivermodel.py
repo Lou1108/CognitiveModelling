@@ -14,7 +14,12 @@
 ### import packages
 ###
 
-import numpy
+import numpy as np
+import math
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
+
 
 
 ###
@@ -149,7 +154,7 @@ def vehicleUpdateNotSteering():
 
     
 
-    vals = numpy.random.normal(loc=gaussDeviateMean, scale=gaussDeviateSD,size=1)[0]
+    vals = np.random.normal(loc=gaussDeviateMean, scale=gaussDeviateSD,size=1)[0]
     returnValue = velocityCheckForVectors(vals)
     return returnValue
 
@@ -160,7 +165,61 @@ def vehicleUpdateNotSteering():
 ### Function to run a trial. Needs to be defined by students (section 2 and 3 of assignment)
 
 def runTrial(nrWordsPerSentence =5,nrSentences=3,nrSteeringMovementsWhenSteering=2, interleaving="word"): 
-    print("hello world")
+    global timePerWord
+    resetParameters()
+    locPos = [startingPositionInLane]
+    trialTime = 0
+    locColor = ["blue"]
+
+    if interleaving == "word":
+        # to do
+        print("hello world")
+
+    # Sample words per minute from normal distribution
+    s = np.random.normal(wordsPerMinuteMean, wordsPerMinuteSD, 1)
+    timePerWord = 1/(s/60) * 1000 
+
+    numberOfDriftsPerWord = math.floor((timePerWord + retrievalTimeWord)/timeStepPerDriftUpdate)
+    numberOfDriftsFirstWord = math.floor((timePerWord + retrievalTimeWord + retrievalTimeSentence)/timeStepPerDriftUpdate)
+    numberOfSteeringDrifts = math.floor(nrSteeringMovementsWhenSteering * steeringUpdateTime/timeStepPerDriftUpdate)
+
+    for i in range(nrSentences):
+        trialTime += retrievalTimeSentence
+        for j in range(nrWordsPerSentence):
+            trialTime += timePerWord
+            trialTime += retrievalTimeWord # TODO maybe take this out
+            trialTime += nrSteeringMovementsWhenSteering * steeringUpdateTime
+
+            if j == 0:
+                n_drifts = numberOfDriftsFirstWord
+            else:
+                n_drifts = numberOfDriftsPerWord
+
+            for i in range(n_drifts):
+                locPos.append(locPos[-1] + vehicleUpdateNotSteering())
+                locColor.append("red")
+
+            for i in range(numberOfSteeringDrifts):
+                locPos.append(locPos[-1] + vehicleUpdateActiveSteering(locPos[-1]))
+                locColor.append("blue")
+
+    scatter_plot(locPos, locColor, trialTime)
+
+            
+def scatter_plot(locPos, locColor, trialTime):
+    timeAxis = np.arange(0, trialTime, 50)
+    print(len(timeAxis))
+    print(len(locPos))
+    df = pd.DataFrame({'time': timeAxis, 'position': locPos})
+    sns.scatterplot(data=df, x='time', y='position', hue=locColor)
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Position (m)")
+    plt.title("Scatter plot of time vs position")
+    plt.show()
+    plt.savefig("scatter_plot_driving.png")
+
+
+
 	
 	
 	
@@ -174,8 +233,4 @@ def runSimulations(nrSims = 100):
 
 
 
-	
-
-
-
-
+runTrial()
