@@ -43,7 +43,11 @@ def gen_box_whisker(data):
 def gen_scatter_plot(data):
     fig = plt.figure(figsize=(10, 7))
     sns.scatterplot(data=data, x="time", y="error")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Error (fraction)")
+    plt.title("Scatter plot of time vs error")
     fig.show()
+    plt.savefig("scatter_plot.png")
 
 
 def example1():
