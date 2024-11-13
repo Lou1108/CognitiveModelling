@@ -138,10 +138,12 @@ def velocityCheckForVectors(velocityVectors):
 ## Function to determine lateral velocity (controlled with steering wheel) based on where car is currently positioned. See Janssen & Brumby (2010) for more detailed explanation.
 ## Lateral velocity update depends on current position in lane. Intuition behind function: the further away you are, the stronger the correction will be that a human makes
 def vehicleUpdateActiveSteering(LD):
+    latVel = 0.2617 * LD*LD + 0.0233 * LD - 0.022
+    if LD < 0:
+        latVel = -1 * latVel
+    returnValue = velocityCheckForVectors(latVel)    
 
-	latVel = 0.2617 * LD*LD + 0.0233 * LD - 0.022
-	returnValue = velocityCheckForVectors(latVel)
-	return returnValue
+    return returnValue
 	
 
 
@@ -172,42 +174,51 @@ def runTrial(nrWordsPerSentence =5,nrSentences=3,nrSteeringMovementsWhenSteering
     locColor = ["blue"]
 
     if interleaving == "word":
-        # to do
-        print("hello world")
+        # Sample words per minute from normal distribution
+        s = np.random.normal(wordsPerMinuteMean, wordsPerMinuteSD, 1)
+        timePerWord = 1/(s/60) * 1000 
 
-    # Sample words per minute from normal distribution
-    s = np.random.normal(wordsPerMinuteMean, wordsPerMinuteSD, 1)
-    timePerWord = 1/(s/60) * 1000 
+        numberOfDriftsPerWord = math.floor((timePerWord + retrievalTimeWord)/timeStepPerDriftUpdate)
+        numberOfDriftsFirstWord = math.floor((timePerWord + retrievalTimeWord + retrievalTimeSentence)/timeStepPerDriftUpdate)
+        numberOfSteeringDrifts = math.floor(nrSteeringMovementsWhenSteering * steeringUpdateTime/timeStepPerDriftUpdate)
+        nMovementsPerDrift = math.floor(steeringUpdateTime/timeStepPerDriftUpdate)
 
-    numberOfDriftsPerWord = math.floor((timePerWord + retrievalTimeWord)/timeStepPerDriftUpdate)
-    numberOfDriftsFirstWord = math.floor((timePerWord + retrievalTimeWord + retrievalTimeSentence)/timeStepPerDriftUpdate)
-    numberOfSteeringDrifts = math.floor(nrSteeringMovementsWhenSteering * steeringUpdateTime/timeStepPerDriftUpdate)
+        for i in range(nrSentences):
+            trialTime += retrievalTimeSentence
+            for j in range(nrWordsPerSentence):
+                trialTime += timePerWord
+                trialTime += retrievalTimeWord # TODO maybe take this out
+                trialTime += nrSteeringMovementsWhenSteering * steeringUpdateTime
 
-    for i in range(nrSentences):
-        trialTime += retrievalTimeSentence
-        for j in range(nrWordsPerSentence):
-            trialTime += timePerWord
-            trialTime += retrievalTimeWord # TODO maybe take this out
-            trialTime += nrSteeringMovementsWhenSteering * steeringUpdateTime
+                if j == 0:
+                    n_drifts = numberOfDriftsFirstWord
+                else:
+                    n_drifts = numberOfDriftsPerWord
 
-            if j == 0:
-                n_drifts = numberOfDriftsFirstWord
-            else:
-                n_drifts = numberOfDriftsPerWord
+                for i in range(n_drifts):
+                    locPos.append(locPos[-1] + vehicleUpdateNotSteering())
+                    locColor.append("red")
+                
+                for i in range(numberOfSteeringDrifts):
+                    #locPos.append(locPos[-1] + vehicleUpdateActiveSteering(locPos[-1]))
+                    locPos.append(vehicleUpdateActiveSteering(locPos[-1]))
+                    locColor.append("blue")
+                    """
+                for i in range(nrSteeringMovementsWhenSteering):
+                    next_pos = vehicleUpdateActiveSteering(locPos[-1])
+                    delta_pos = (next_pos-locPos[-1])/nMovementsPerDrift
+                    for j in range(nMovementsPerDrift):
+                        #locPos.append(locPos[-1] +  delta_pos)
+                        locPos.append(next_pos)
+                        locColor.append("blue")
+                """
+        scatter_plot(locPos, locColor, trialTime)
 
-            for i in range(n_drifts):
-                locPos.append(locPos[-1] + vehicleUpdateNotSteering())
-                locColor.append("red")
-
-            for i in range(numberOfSteeringDrifts):
-                locPos.append(locPos[-1] + vehicleUpdateActiveSteering(locPos[-1]))
-                locColor.append("blue")
-
-    scatter_plot(locPos, locColor, trialTime)
+    
 
             
 def scatter_plot(locPos, locColor, trialTime):
-    timeAxis = np.arange(0, trialTime, 50)
+    timeAxis = np.arange(0, len(locPos) * 50, 50)
     print(len(timeAxis))
     print(len(locPos))
     df = pd.DataFrame({'time': timeAxis, 'position': locPos})
@@ -215,8 +226,9 @@ def scatter_plot(locPos, locColor, trialTime):
     plt.xlabel("Time (ms)")
     plt.ylabel("Position (m)")
     plt.title("Scatter plot of time vs position")
-    plt.show()
+
     plt.savefig("scatter_plot_driving.png")
+    plt.show()
 
 
 
