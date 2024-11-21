@@ -156,6 +156,42 @@ def runTrial(nrWordsPerSentence=17, nrSentences=10, nrSteeringMovementsWhenSteer
     s = max(0, np.random.normal(wordsPerMinuteMean, wordsPerMinuteSD))
     timePerWord = 1 / (s / 60) * 1000
 
+    if interleaving == "bonus":
+        numberOfSteeringDrifts = math.floor(
+            nrSteeringMovementsWhenSteering * steeringUpdateTime / timeStepPerDriftUpdate)
+
+        words_left = nrWordsPerSentence * nrSentences  # total words to process
+
+        while words_left > 0:
+            # determine number of words to read in current batch; assume we read at least one word everytime
+            words_to_read = random.choice(range(1, min(words_left, nrWordsPerSentence * 2))) if words_left > 1 else 1
+
+            trialTime += timePerWord * words_to_read
+
+            # add retrieval time for sentence or word depending on or current position in sentence
+            if words_left % nrWordsPerSentence == 0:
+                trialTime += retrievalTimeSentence
+            else:
+                trialTime += retrievalTimeWord
+
+            # add sentence retrieval time if a new sentence start is encountered in our current word batch
+            for w in range(words_left - words_to_read, words_left):
+                if w % nrWordsPerSentence == 0:
+                    trialTime += retrievalTimeSentence
+
+            # simulate the car drifts while typing
+            drift_steps = math.floor(timePerWord * words_to_read / timeStepPerDriftUpdate)
+            for _ in range(drift_steps):
+                locPos.append((locPos[-1] + vehicleUpdateNotSteering() * 0.05))
+                locColor.append("red")
+
+            # actively steer after one batch of words
+            for _ in range(numberOfSteeringDrifts):
+                locPos.append(locPos[-1] + vehicleUpdateActiveSteering(locPos[-1]) * 0.05)
+                locColor.append("blue")
+
+            words_left = words_left - words_to_read  # update remaining word count in email
+
     if interleaving == "word":
         numberOfDriftsPerWord = math.floor((timePerWord + retrievalTimeWord) / timeStepPerDriftUpdate)
         numberOfDriftsFirstWord = math.floor(
@@ -214,10 +250,6 @@ def runTrial(nrWordsPerSentence=17, nrSentences=10, nrSteeringMovementsWhenSteer
             locColor.append("blue")
 
     if interleaving == "none":
-        # Sample words per minute from normal distribution
-        s = max(0, np.random.normal(wordsPerMinuteMean, wordsPerMinuteSD))
-        timePerWord = 1 / (s / 60) * 1000
-
         timePerEmail = timePerWord * nrWordsPerSentence * nrSentences + (nrSentences * retrievalTimeSentence)
         totalNumberOfDrifts = math.floor(timePerEmail / timeStepPerDriftUpdate)
 
@@ -226,36 +258,10 @@ def runTrial(nrWordsPerSentence=17, nrSentences=10, nrSteeringMovementsWhenSteer
             locPos.append((locPos[-1] + vehicleUpdateNotSteering() * 0.05))
             locColor.append("red")
 
-    if interleaving == "bonus":
-        numberOfSteeringDrifts = math.floor(
-            nrSteeringMovementsWhenSteering * steeringUpdateTime / timeStepPerDriftUpdate)
-
-        words_left = nrWordsPerSentence * nrSentences
-
-        # TODO add retrieval times
-        while words_left > 1:  #TODO check if all are used
-            words_to_read = random.choice(range(1, min(words_left, 10)))  # assume we read at least one word everytime
-            print(words_to_read)
-
-            words_left = words_left - words_to_read
-
-            # trialTime += retrievalTimeSentence
-            cur_reading_time = timePerWord * words_to_read
-            trialTime += cur_reading_time
-
-            for _ in range(math.floor(cur_reading_time / timeStepPerDriftUpdate)):
-                locPos.append((locPos[-1] + vehicleUpdateNotSteering() * 0.05))
-                locColor.append("red")
-
-            for _ in range(numberOfSteeringDrifts):
-                locPos.append(locPos[-1] + vehicleUpdateActiveSteering(locPos[-1]) * 0.05)
-                locColor.append("blue")
-
-
     mean_lat_dev = mean(locPos)
     max_lat_dev = max(map(abs, locPos))
 
-    #scatter_plot(locPos, locColor, mean_lat_dev, max_lat_dev, trialTime)
+    # scatter_plot(locPos, locColor, mean_lat_dev, max_lat_dev, trialTime)
 
     return trialTime, mean_lat_dev, max_lat_dev
 
@@ -283,7 +289,6 @@ def scatter_plot(locPos, locColor, mean_lat_dev, max_lat_dev, trialTime):
     plt.show()
 
 
-
 ### function to run multiple simulations. Needs to be defined by students (section 3 of assignment)
 def runSimulations(nrSims=100):
     totalTime = []
@@ -295,7 +300,7 @@ def runSimulations(nrSims=100):
     nrSentences = 10
     nrSteeringMovementsWhenSteering = 4
 
-    for s in ["word", "sentence", "drivingOnly", "none"]:
+    for s in ["word", "sentence", "drivingOnly", "none", "bonus"]:
         for i in range(nrSims):
             nrWordsPerSentence = random.choice(set_choices)  # uniformly selected
             trialTime, mean_lat_dev, max_lat_dev = runTrial(nrWordsPerSentence, nrSentences,
@@ -310,10 +315,11 @@ def runSimulations(nrSims=100):
 
 def plot_simulations(totalTime, meanDeviation, maxDeviation, Condition):
     plt.figure(figsize=(10, 6))
-    marker_styles = ['o', 's', 'D',  'v']
-    df = pd.DataFrame({'time': totalTime, 'meanDeviation': meanDeviation, 'maxDeviation': maxDeviation, 'Condition': Condition})
-    #plt.plot(totalTime, maxDeviation)
-    sns.scatterplot(data=df, x='time', y='maxDeviation',  style='Condition', markers=marker_styles, color='grey')
+    marker_styles = ['o', 's', 'D', 'v', "p"]
+    df = pd.DataFrame(
+        {'time': totalTime, 'meanDeviation': meanDeviation, 'maxDeviation': maxDeviation, 'Condition': Condition})
+    # plt.plot(totalTime, maxDeviation)
+    sns.scatterplot(data=df, x='time', y='maxDeviation', style='Condition', markers=marker_styles, color='grey')
 
     avg_max_dev = []
     avg_trial_times = []
@@ -321,28 +327,30 @@ def plot_simulations(totalTime, meanDeviation, maxDeviation, Condition):
     std_time = []
 
     # mean per condition
-    for s in ["word", "sentence", "drivingOnly", "none"]:
+    for s in ["word", "sentence", "drivingOnly", "none", "bonus"]:
         df_cond = df.loc[(df['Condition'] == s)]
         avg_max_dev.append(df_cond["maxDeviation"].mean())
         avg_trial_times.append(df_cond["time"].mean())
         std_max_dev.append(np.std(df_cond["maxDeviation"]))
         std_time.append(np.std(df_cond["time"]))
 
-    df_cond = pd.DataFrame({'avg_max_dev': avg_max_dev, 'avg_trial_times': avg_trial_times, 'Condition':["word (mean)", "sentence (mean)", "drivingOnly (mean)", "none (mean)"]})
-    sns.scatterplot(data=df_cond, x='avg_trial_times', y='avg_max_dev', hue='Condition', style='Condition', markers=marker_styles, palette=["red", "blue", "green", "orange"], s=70)
+    df_cond = pd.DataFrame({'avg_max_dev': avg_max_dev, 'avg_trial_times': avg_trial_times,
+                            'Condition': ["word (mean)", "sentence (mean)", "drivingOnly (mean)", "none (mean)",
+                                          "bonus (mean)"]})
+    sns.scatterplot(data=df_cond, x='avg_trial_times', y='avg_max_dev', hue='Condition', style='Condition',
+                    markers=marker_styles, palette=["red", "blue", "green", "orange", "purple"], s=70)
 
     plt.errorbar(avg_trial_times, avg_max_dev, xerr=std_time, yerr=std_max_dev, fmt="none", capsize=5)
 
     plt.xlabel("Total Trial Time (ms)")
     plt.ylabel("Max Lateral Deviation (m)")
     plt.title("Simulations of Maximum Lateral Deviation Over Time")
-#    plt.legend(["word", "sentence", "drivingOnly", "none", "word (mean)", "sentence (mean)", "drivingOnly (mean)", "none (mean)"])
+    #    plt.legend(["word", "sentence", "drivingOnly", "none", "word (mean)", "sentence (mean)", "drivingOnly (mean)", "none (mean)"])
     plt.savefig("simulation_run_driving.png")
     plt.show()
 
 
-#for i in range(10):
-#runTrial(interleaving="word")
+# runTrial(interleaving="bonus")
 
 totalTime, meanDeviation, maxDeviation, Condition = runSimulations(100)
 plot_simulations(totalTime, meanDeviation, maxDeviation, Condition)
