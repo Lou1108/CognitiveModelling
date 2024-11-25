@@ -129,7 +129,8 @@ def vehicleUpdateActiveSteering(LD):
 
     if LD > 0:
         returnValue = -returnValue
-
+    if LD < 0:
+        returnValue = abs(returnValue)
     return returnValue
 
 
@@ -278,14 +279,14 @@ def scatter_plot(locPos, locColor, mean_lat_dev, max_lat_dev, trialTime):
                             label='Mean position = ' + str(round(mean_lat_dev, 4)))
     max_line = plt.axhline(y=max_lat_dev, color='g',
                            label='Max position (Absolute) = ' + str(round(max_lat_dev, 4)))
-    plt.title("Lane Position Over Time (Interleaving Strategy 'word')")
+    plt.title("Lane Position Over Time (Interleaving Strategy 'sentence')")
 
     trial_time_line = plt.Line2D([0], [0], marker='', color='w',
                                  label='Total trial time = ' + str(round(trialTime, 2)) + ' ms')
 
     # Combine the lines for the legend
     plt.legend(handles=[mean_line, max_line, trial_time_line])
-    plt.savefig("scatter_plot_driving_8.png")
+    plt.savefig("scatter_plot_driving_s_9.png")
     plt.show()
 
 
@@ -350,7 +351,7 @@ def plot_simulations(totalTime, meanDeviation, maxDeviation, Condition):
     plt.show()
 
 
-# runTrial(interleaving="bonus")
+# runTrial(interleaving="sentence")
 
 totalTime, meanDeviation, maxDeviation, Condition = runSimulations(100)
 plot_simulations(totalTime, meanDeviation, maxDeviation, Condition)
