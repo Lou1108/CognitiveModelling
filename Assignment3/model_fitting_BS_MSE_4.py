@@ -15,12 +15,15 @@ We are grateful for Zhu et al for openly sharing their work.
 
 import numpy as np
 import scipy.stats as st
+from matplotlib import pyplot as plt
 from scipy.optimize import fmin, differential_evolution
 import glob
 import pandas as pd
 import pickle
 import math
 
+N = None
+beta = None
 
 ### Comment Chris: This function processes the subject data. Note that you should have the data stored in a specific subdirectory (all_data)
 def clean_data():
@@ -116,8 +119,11 @@ def generativeModel_BS(params):
     give a set of free parameters for BS model
      --> output the model predicted distributions for all querys
     """
+
+    global beta, N
+
     a, b, c, d = [0, 0], [0, 0], [0, 0], [0, 0]
-    a[0], b[0], c[0], d[0], a[1], b[1], c[1], d[1], beta, N = params
+    a[0], b[0], c[0], d[0], a[1], b[1], c[1], d[1] = params
     N2 = N
     MSE = 0
 
@@ -159,48 +165,47 @@ def init_fit_BS(free_parameter=6):
     """
     initialize model fitting practice for Bayesian sampling model
     """
-    global testdata
+    global testdata, beta, N
+
     print(np.shape(pData))
     bnds = [(0.0, 100), (0.0, 100), (0.0, 100), (0.0, 100),
-            (0.0, 100), (0.0, 100), (0.0, 100), (0.0, 100),
-            (0, 1), (1, 250)]
-    totBIC = 0
-    for ipar in range(84):  # loop through participants
-        minMSE, n_data, BIC = 0, 0, 0
-        n_para = 7  # effective number of parameters: [a,b,c]*2, beta/(n+2beta), beta/(n2+2beta)
-        testdata = pData[ipar, :, :]
-        fit_all_data = differential_evolution(MSE_BS, bounds=bnds,
-                                              popsize=30,
-                                              disp=False, polish=fmin, tol=1e-5)
-        print(fit_all_data.x, fit_all_data.fun)
+            (0.0, 100), (0.0, 100), (0.0, 100), (0.0, 100)]
 
-        minMSE = fit_all_data.fun
-        n_data = 40 * 3
-        allpredmeans, _ = generativeModel_BS(fit_all_data.x)
+    mse_results = []
 
-        # TODO
-        ### Comment Chris: once you are at the relevant part of the assignment, replace the "=0" with a call to your function that calculates the BIC
-        BIC = calculate_BIC(n_data, free_parameter, minMSE)
-        totBIC += BIC
+    for n in [1, 2, 5, 10, 50, 100]:
+        N = n
+        for b in [0.1, 0.5, 1, 2, 5]:
+            beta = b
 
-        print('BIC score of Bayesian sampling model:', BIC)
+            mse_participants = []
+            for ipar in range(10):  # loop through participants
 
-        # model 1,2 = Bayesian sampling (1:one sample size, 2:two sample sizes)
-        # model 3   = Sampling/RF
-        saved_location = 'fit_results/part_' + str(ipar) + '_model_1.pkl'
-        with open(saved_location, 'wb') as f:
-            pickle.dump({'fitResults': fit_all_data,
-                         'predmean': allpredmeans,
-                         'bic': BIC}, f)
+                testdata = pData[ipar, :, :]
+                fit_all_data = differential_evolution(MSE_BS, bounds=bnds,
+                                                      popsize=30,
+                                                      disp=False, polish=fmin, tol=1e-5)
+                _, mse_ipar = generativeModel_BS(fit_all_data.x)
 
-    print('total BIC:', totBIC)
-    return totBIC
+                mse_participants.append(mse_ipar)
+            mse_results.append((N, beta, np.mean(mse_participants)))
+            print(f"N: {N}, Beta: {beta}, Mean MSE: {np.mean(mse_participants)}")
+    return mse_results
 
 
-def calculate_BIC(n, free_param, mse):
-    # n * log(MSE) + log(n) * (parameters + 1) + n * log(2*pi) + n
-    bic = n * math.log10(mse) + math.log10(n) * (free_param + 1) + n * math.log10(2 * np.pi) + n
-    return bic
+def plot_results(results):
+    results_df = pd.DataFrame(results, columns=['N', 'Beta', 'MSE'])
+    line_styles = ['solid', '--', ':', '-', '-.', '--']
+    marker_styles = ['o', '^', '+', 'x', 'D', 'v']
+    for i, N in enumerate(results_df['N'].unique()):
+        subset = results_df[results_df['N'] == N]
+        plt.plot(subset['Beta'], subset['MSE'], label=f'N={N}', linestyle=line_styles[i % len(line_styles)], marker = marker_styles[i % len(marker_styles)])
+
+    plt.xlabel('Beta')
+    plt.ylabel('Mean MSE')
+    plt.legend()
+    plt.title('MSE vs Beta for Different N Values')
+    plt.show()
 
 
 ################################
@@ -209,6 +214,9 @@ def calculate_BIC(n, free_param, mse):
 
 global pData
 pData, queryOrder = clean_data()
+
+results = init_fit_BS()
+plot_results(results)
 
 # init_fit_BS()
 

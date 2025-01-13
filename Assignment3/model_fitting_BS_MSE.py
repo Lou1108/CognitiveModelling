@@ -176,7 +176,6 @@ def init_fit_BS(free_parameter=6):
 
         minMSE = fit_all_data.fun
         n_data = 40 * 3
-
         allpredmeans, _ = generativeModel_BS(fit_all_data.x)
 
         # TODO
